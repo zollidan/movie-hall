@@ -101,12 +101,16 @@ func (d DB) scanLibraryDirectory(libPath string) error {
 			}
 
 			if count == 0 {
-				movie := Movies{Title: e.Name()}
+				parsed := parseMovieTitle(e.Name())
+				movie := Movies{
+					Title: parsed.Title,
+					Year:  parsed.Year,
+				}
 				err = d.db.Create(&movie).Error
 				if err != nil {
 					return fmt.Errorf("failed to create movie record: %w", err)
 				}
-				log.Printf("Added movie: %s", e.Name())
+				log.Printf("Added movie: %s (%d)", movie.Title, movie.Year)
 			}
 		}
 	}
