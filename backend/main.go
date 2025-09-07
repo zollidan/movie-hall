@@ -50,18 +50,21 @@ type SuccessResponse struct {
 	Message string `json:"message"`
 }
 
+// writeError отправляет JSON ответ с ошибкой и указанным HTTP статус кодом
 func (d DB) writeError(w http.ResponseWriter, statusCode int, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 	json.NewEncoder(w).Encode(ErrorResponse{Error: message})
 }
 
+// writeSuccess отправляет JSON ответ с сообщением об успешной операции
 func (d DB) writeSuccess(w http.ResponseWriter, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(SuccessResponse{Message: message})
 }
 
+// getLibraryPath возвращает путь к библиотеке фильмов из настроек
 func (d DB) getLibraryPath() (string, error) {
 	var settings Settings
 	err := d.db.First(&settings).Error
@@ -71,6 +74,7 @@ func (d DB) getLibraryPath() (string, error) {
 	return settings.LibPath, nil
 }
 
+// scanLibraryDirectory сканирует директорию с фильмами и добавляет новые фильмы в базу данных
 func (d DB) scanLibraryDirectory(libPath string) error {
 	entries, err := os.ReadDir(libPath)
 	if err != nil {
@@ -109,6 +113,7 @@ func (d DB) scanLibraryDirectory(libPath string) error {
 	return nil
 }
 
+// showLibrary возвращает список всех фильмов из библиотеки. При первом вызове автоматически сканирует директорию
 func (d DB) showLibrary(w http.ResponseWriter, r *http.Request) {
 	var moviesCount int64
 	err := d.db.Model(&Movies{}).Count(&moviesCount).Error
@@ -154,6 +159,7 @@ func (d DB) showLibrary(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(movies)
 }
 
+// showSettings возвращает все настройки приложения в формате JSON
 func (d DB) showSettings(w http.ResponseWriter, r *http.Request) {
 	var settings []Settings
 	err := d.db.Find(&settings).Error
@@ -166,6 +172,7 @@ func (d DB) showSettings(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(settings)
 }
 
+// setSettings создает или обновляет настройки приложения, включая путь к библиотеке фильмов
 func (d DB) setSettings(w http.ResponseWriter, r *http.Request) {
 	var requestBody SettingsRequest
 	err := json.NewDecoder(r.Body).Decode(&requestBody)
@@ -211,6 +218,7 @@ func (d DB) setSettings(w http.ResponseWriter, r *http.Request) {
 	d.writeSuccess(w, "Settings saved successfully")
 }
 
+// rescanLibrary принудительно пересканирует библиотеку фильмов и добавляет новые файлы в базу данных
 func (d DB) rescanLibrary(w http.ResponseWriter, r *http.Request) {
 	libPath, err := d.getLibraryPath()
 	if err != nil {
@@ -227,6 +235,7 @@ func (d DB) rescanLibrary(w http.ResponseWriter, r *http.Request) {
 	d.writeSuccess(w, "Library rescanned successfully")
 }
 
+// main инициализирует базу данных, настраивает HTTP маршруты и запускает веб-сервер
 func main() {
 	db, err := gorm.Open(sqlite.Open("movs.db"), &gorm.Config{})
 	if err != nil {
