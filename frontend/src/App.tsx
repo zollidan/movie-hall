@@ -1,9 +1,17 @@
-import { Button } from "./components/ui/button";
+import { ModeToggle } from "@/components/mode-toggle";
+import { MovieGrid } from "@/components/movie-grid";
 
 function App() {
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center">
-      <Button>Click me</Button>
+    <div className="min-h-screen bg-background">
+      <div className="p-4">
+        <div className="flex justify-end mb-4">
+          <ModeToggle />
+        </div>
+        <div className="container mx-auto">
+          <MovieGrid />
+        </div>
+      </div>
     </div>
   );
 }
