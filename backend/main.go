@@ -9,7 +9,10 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
+
+	_ "github.com/joho/godotenv/autoload" // Automatically load .env file
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -93,7 +96,6 @@ func (d DB) scanLibraryDirectory(libPath string) error {
 
 		ext := strings.ToLower(filepath.Ext(e.Name()))
 		if slices.Contains(videoFormats, ext) {
-			// Проверяем, не существует ли уже такой фильм
 			var count int64
 			err := d.db.Model(&Movies{}).Where("title = ?", e.Name()).Count(&count).Error
 			if err != nil {
@@ -106,6 +108,18 @@ func (d DB) scanLibraryDirectory(libPath string) error {
 					Title: parsed.Title,
 					Year:  parsed.Year,
 				}
+
+				// Try to fetch additional info from OMDB
+				if omdbInfo, err := fetchMovieInfo(parsed.Title, parsed.Year); err == nil {
+					movie.Title = omdbInfo.Title // Use official title
+					if year, err := strconv.Atoi(omdbInfo.Year); err == nil {
+						movie.Year = year
+					}
+					movie.Cover = omdbInfo.Poster
+				} else {
+					log.Printf("Failed to fetch OMDB info for %s: %v", parsed.Title, err)
+				}
+
 				err = d.db.Create(&movie).Error
 				if err != nil {
 					return fmt.Errorf("failed to create movie record: %w", err)
@@ -240,6 +254,35 @@ func (d DB) rescanLibrary(w http.ResponseWriter, r *http.Request) {
 	d.writeSuccess(w, "Library rescanned successfully")
 }
 
+// refreshMovieInfo refreshes movie information from OMDB API for a specific movie
+func (d DB) refreshMovieInfo(w http.ResponseWriter, r *http.Request) {
+	var movie Movies
+	movieID := chi.URLParam(r, "id")
+
+	if err := d.db.First(&movie, movieID).Error; err != nil {
+		d.writeError(w, http.StatusNotFound, "Movie not found")
+		return
+	}
+
+	if omdbInfo, err := fetchMovieInfo(movie.Title, movie.Year); err == nil {
+		movie.Title = omdbInfo.Title
+		if year, err := strconv.Atoi(omdbInfo.Year); err == nil {
+			movie.Year = year
+		}
+		movie.Cover = omdbInfo.Poster
+
+		if err := d.db.Save(&movie).Error; err != nil {
+			d.writeError(w, http.StatusInternalServerError, "Failed to update movie")
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(movie)
+	} else {
+		d.writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to fetch OMDB info: %v", err))
+	}
+}
+
 // main инициализирует базу данных, настраивает HTTP маршруты и запускает веб-сервер
 func main() {
 	db, err := gorm.Open(sqlite.Open("movs.db"), &gorm.Config{})
@@ -272,6 +315,8 @@ func main() {
 		r.Post("/library/rescan", app.rescanLibrary)
 		r.Get("/settings", app.showSettings)
 		r.Post("/settings", app.setSettings)
+
+		r.Post("/movies/{id}/refresh", app.refreshMovieInfo)
 	})
 
 	log.Printf("Starting server on http://%s\n", addr)

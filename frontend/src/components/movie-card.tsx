@@ -5,14 +5,24 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { RefreshCw } from "lucide-react";
 
 interface MovieCardProps {
+  id: number;
   title: string;
   year: number;
   cover?: string;
+  onRefresh?: (id: number) => void;
 }
 
-export function MovieCard({ title, year, cover }: MovieCardProps) {
+export function MovieCard({
+  id,
+  title,
+  year,
+  cover,
+  onRefresh,
+}: MovieCardProps) {
   return (
     <Card className="overflow-hidden">
       <CardHeader>
@@ -33,10 +43,20 @@ export function MovieCard({ title, year, cover }: MovieCardProps) {
           </div>
         )}
       </CardContent>
-      <CardFooter>
+      <CardFooter className="flex justify-between items-center">
         <p className="text-sm text-muted-foreground">
           {year || "Unknown Year"}
         </p>
+        {onRefresh && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => onRefresh(id)}
+            title="Refresh movie info"
+          >
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+        )}
       </CardFooter>
     </Card>
   );

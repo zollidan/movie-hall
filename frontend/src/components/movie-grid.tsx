@@ -4,11 +4,18 @@ import { MovieCard } from "./movie-card";
 import { MovieCardSkeleton } from "./movie-card-skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
+import { Toast } from "@/components/ui/toast";
 
 export function MovieGrid() {
   const [movies, setMovies] = useState<Movie[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState<number | null>(null);
+  const [toast, setToast] = useState<{
+    type: "success" | "error";
+    title: string;
+    description?: string;
+  } | null>(null);
 
   useEffect(() => {
     const fetchMovies = async () => {
@@ -66,16 +73,58 @@ export function MovieGrid() {
     );
   }
 
+  const handleRefresh = async (id: number) => {
+    try {
+      setRefreshing(id);
+      const response = await fetch(
+        `http://localhost:8080/api/movies/${id}/refresh`,
+        {
+          method: "POST",
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to refresh movie info");
+      }
+
+      const updatedMovie = await response.json();
+      setMovies(
+        movies.map((movie) => (movie.ID === id ? updatedMovie : movie))
+      );
+
+      setToast({
+        type: "success",
+        title: "Movie Updated",
+        description: "Movie information has been refreshed",
+      });
+    } catch (err) {
+      setToast({
+        type: "error",
+        title: "Update Failed",
+        description:
+          err instanceof Error ? err.message : "Failed to update movie info",
+      });
+    } finally {
+      setRefreshing(null);
+      setTimeout(() => setToast(null), 3000);
+    }
+  };
+
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-      {movies.map((movie) => (
-        <MovieCard
-          key={movie.ID}
-          title={movie.Title}
-          year={movie.Year}
-          cover={movie.Cover}
-        />
-      ))}
-    </div>
+    <>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        {movies.map((movie) => (
+          <MovieCard
+            key={movie.ID}
+            id={movie.ID}
+            title={movie.Title}
+            year={movie.Year}
+            cover={movie.Cover}
+            onRefresh={handleRefresh}
+          />
+        ))}
+      </div>
+      {toast && <Toast {...toast} />}
+    </>
   );
 }
